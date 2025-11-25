@@ -475,6 +475,13 @@
                     </div>
                 </div>
             `;
+            const detailsSection = document.getElementById('floor-view-container').querySelector('.shadow-2xl');
+            if (detailsSection) {
+                detailsSection.scrollIntoView({ 
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
         }
 
         function toggleView(view) {
