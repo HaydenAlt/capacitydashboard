@@ -1,0 +1,22 @@
+[
+{
+"room_id": "101",
+"current_occupancy": 0,
+},
+{
+"room_id": "102",
+"current_occupancy": 10,
+},
+{
+"room_id": "103",
+"current_occupancy": 20,
+}
+{
+"room_id": "104",
+"current_occupancy": 30,
+}
+{
+"room_id": "105",
+"current_occupancy": 40,
+}
+]
