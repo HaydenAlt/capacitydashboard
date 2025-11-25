@@ -27,7 +27,7 @@
                 'refresh_data': 'Refresh Data',
                 'loading': 'Loading...',
                 'fetching_data': 'Fetching real-time data...',
-                'error_loading': 'Error loading data. Check console.',
+                'error_loading': 'Error loading data. Find us in stem lab.',
                 'sort_by': 'Sort By:',
                 'option_id': 'Room ID',
                 'option_percentage': '% Full',
@@ -38,7 +38,7 @@
                 'room_id_label': 'Room ID',
                 'capacity_label': 'Capacity',
                 'people_label': 'people',
-                'error_api': 'Error fetching data from API. Using mock data.',
+                'error_api': 'Error fetching data from API.',
                 'floor_view_mode': 'Floor View Mode'
             },
             'zh': {
@@ -47,7 +47,7 @@
                 'refresh_data': '刷新數據',
                 'loading': '載入中...',
                 'fetching_data': '正在獲取實時數據...',
-                'error_loading': '載入數據錯誤。請檢查控制台。',
+                'error_loading': '載入數據錯誤。請在 stem lab 找到我們。',
                 'sort_by': '排序方式：',
                 'option_id': '房間編號',
                 'option_percentage': '佔用百分比',
@@ -58,7 +58,7 @@
                 'room_id_label': '房間編號',
                 'capacity_label': '容量',
                 'people_label': '人',
-                'error_api': '從 API 獲取數據錯誤。正在使用模擬數據。',
+                'error_api': '從 API 獲取數據錯誤。',
                 'floor_view_mode': '樓層視圖模式'
             }
         };
@@ -66,6 +66,9 @@
         const STATIC_ROOM_CONFIG = [
             { room_id: "101", name: "Zenith Boardroom", name_zh: "天頂會議室", max_capacity: 10, floor_label: "1/F" },
             { room_id: "102", name: "Apollo Meeting Pod", name_zh: "阿波羅會議艙", max_capacity: 5, floor_label: "1/F" },
+            { room_id: "103", name: "Huddle Room 3", name_zh: "會談室 3", max_capacity: 15, floor_label: "1/F" },
+            { room_id: "104", name: "Training Room A", name_zh: "培訓室 A", max_capacity: 30, floor_label: "1/F" },
+            { room_id: "105", name: "Training Room B", name_zh: "培訓室 B", max_capacity: 30, floor_label: "1/F" },
             { room_id: "203", name: "Jupiter Training Hall", name_zh: "木星培訓大廳", max_capacity: 50, floor_label: "2/F" },
             { room_id: "205", name: "Quiet Focus Room", name_zh: "安靜專注室", max_capacity: 2, floor_label: "2/F" },
             { room_id: "301", name: "Innovation Hub", name_zh: "創新中心", max_capacity: 75, floor_label: "3/F" },
@@ -73,7 +76,7 @@
             { room_id: "401", name: "Executive Suite", name_zh: "行政套房", max_capacity: 8, floor_label: "4/F" },
         ];
 
-        const API_URL = 'https://haydenalt.github.io/capacitydashboard/';
+        const API_URL = 'https://haydenalt.github.io/capacitydashboard/data.json';
         const FLOOR_VIEW_URL = 'https://haydenalt.github.io/capacitydashboard/floorview';
 
         let currentRoomData = [];
@@ -86,44 +89,31 @@
         }
 
         async function fetchOccupancyData() {
-            let apiOccupancy = [];
-            let errorOccurred = false;
+            const response = await fetch(API_URL);
+            
+            // Clone the response stream immediately for error logging fallback
+            const clonedResponse = response.clone();
 
+            if (!response.ok) {
+                // If the response status is not OK, read the body from the clone for logging
+                const text = await clonedResponse.text();
+                console.error("Non-OK response body:", text);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             try {
-                const response = await fetch(API_URL);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                apiOccupancy = await response.json();
-
+                // Attempt to read the original response body as JSON
+                const apiOccupancy = await response.json();
                 if (!Array.isArray(apiOccupancy)) {
                     throw new Error("API response is not an array.");
                 }
-
+                return apiOccupancy;
             } catch (error) {
-                console.error(translate('error_api'), error);
-                errorOccurred = true;
+                // If JSON parsing fails, read the raw text from the clone for diagnosis.
+                const text = await clonedResponse.text();
+                console.error("Raw response text (JSON parsing failed):", text);
+                throw new Error(`JSON Parsing Error: ${error.message}`);
             }
-
-            const finalOccupancy = [...apiOccupancy];
-            const presentRoomIds = new Set(apiOccupancy.map(o => o.room_id));
-
-            STATIC_ROOM_CONFIG.forEach(config => {
-                if (!presentRoomIds.has(config.room_id)) {
-                    const occupancy = Math.floor(Math.random() * (config.max_capacity + 1));
-                    finalOccupancy.push({
-                        room_id: config.room_id,
-                        current_occupancy: occupancy,
-                        timestamp: Date.now() / 1000 - Math.floor(Math.random() * 300)
-                    });
-                }
-            });
-
-            if (errorOccurred) {
-                console.warn(translate('error_api'));
-            }
-            
-            return finalOccupancy;
         }
 
         function getMergedRoomData(occupancyData) {
@@ -153,8 +143,7 @@
                     ...config,
                     current_occupancy,
                     percentage,
-                    colorClass,
-                    timestamp: occupancy ? occupancy.timestamp : null
+                    colorClass
                 };
             });
         }
@@ -302,7 +291,7 @@
                 
                 sortRooms(currentSortKey); 
             } catch (error) {
-                console.error("Critical error during data processing:", error);
+                console.error("Critical error during data processing:", translate('error_api'), error);
                 listContainer.innerHTML = `<div class="text-center text-red-500 py-8 font-semibold">${translate('error_loading')}</div>`;
             } finally {
                 refreshButton.disabled = false;
