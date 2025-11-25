@@ -37,7 +37,9 @@
                 'floor': 'Floor',
                 'room_id_label': 'Room ID',
                 'capacity_label': 'Capacity',
-                'people_label': 'people'
+                'people_label': 'people',
+                'error_api': 'Error fetching data from API. Using mock data.',
+                'floor_view_mode': 'Floor View Mode'
             },
             'zh': {
                 'title': '實時房間佔用監控',
@@ -55,7 +57,9 @@
                 'floor': '樓層',
                 'room_id_label': '房間編號',
                 'capacity_label': '容量',
-                'people_label': '人'
+                'people_label': '人',
+                'error_api': '從 API 獲取數據錯誤。正在使用模擬數據。',
+                'floor_view_mode': '樓層視圖模式'
             }
         };
 
@@ -69,6 +73,9 @@
             { room_id: "401", name: "Executive Suite", name_zh: "行政套房", max_capacity: 8, floor_label: "4/F" },
         ];
 
+        const API_URL = 'https://haydenalt.github.io/capacitydashboard/';
+        const FLOOR_VIEW_URL = 'https://haydenalt.github.io/capacitydashboard/floorview';
+
         let currentRoomData = [];
         let currentSortKey = 'id';
         let currentSortDirection = 'asc'; 
@@ -79,25 +86,44 @@
         }
 
         async function fetchOccupancyData() {
-            await new Promise(resolve => setTimeout(resolve, 500));
+            let apiOccupancy = [];
+            let errorOccurred = false;
 
-            const mockOccupancy = [
-                { "room_id": "101", "current_occupancy": 5, "timestamp": Date.now() / 1000 - 100 },
-                { "room_id": "102", "current_occupancy": 3, "timestamp": Date.now() / 1000 - 90 },
-            ];
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                apiOccupancy = await response.json();
+
+                if (!Array.isArray(apiOccupancy)) {
+                    throw new Error("API response is not an array.");
+                }
+
+            } catch (error) {
+                console.error(translate('error_api'), error);
+                errorOccurred = true;
+            }
+
+            const finalOccupancy = [...apiOccupancy];
+            const presentRoomIds = new Set(apiOccupancy.map(o => o.room_id));
 
             STATIC_ROOM_CONFIG.forEach(config => {
-                if (!mockOccupancy.find(o => o.room_id === config.room_id)) {
+                if (!presentRoomIds.has(config.room_id)) {
                     const occupancy = Math.floor(Math.random() * (config.max_capacity + 1));
-                    mockOccupancy.push({
+                    finalOccupancy.push({
                         room_id: config.room_id,
                         current_occupancy: occupancy,
-                        timestamp: Date.now() / 1000 - Math.floor(Math.random() * 50)
+                        timestamp: Date.now() / 1000 - Math.floor(Math.random() * 300)
                     });
                 }
             });
 
-            return mockOccupancy;
+            if (errorOccurred) {
+                console.warn(translate('error_api'));
+            }
+            
+            return finalOccupancy;
         }
 
         function getMergedRoomData(occupancyData) {
@@ -106,6 +132,7 @@
             return STATIC_ROOM_CONFIG.map(config => {
                 const occupancy = occupancyMap.get(config.room_id);
                 const current_occupancy = occupancy ? occupancy.current_occupancy : 0;
+                
                 const percentage = config.max_capacity > 0 
                     ? Math.min(100, Math.round((current_occupancy / config.max_capacity) * 100))
                     : 0;
@@ -248,6 +275,7 @@
                 document.getElementById('refresh-button-text').textContent = translate('refresh_data');
                 document.getElementById('loading-indicator').textContent = translate('loading');
                 document.getElementById('sort-by-label').textContent = translate('sort_by');
+                document.getElementById('floor-view-button-text').textContent = translate('floor_view_mode');
 
                 document.querySelector('#sort-key-dropdown option[value="id"]').textContent = translate('option_id');
                 document.querySelector('#sort-key-dropdown option[value="percentage"]').textContent = translate('option_percentage');
@@ -274,7 +302,7 @@
                 
                 sortRooms(currentSortKey); 
             } catch (error) {
-                console.error("Error fetching data:", error);
+                console.error("Critical error during data processing:", error);
                 listContainer.innerHTML = `<div class="text-center text-red-500 py-8 font-semibold">${translate('error_loading')}</div>`;
             } finally {
                 refreshButton.disabled = false;
@@ -283,7 +311,6 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            
             const langDropdown = document.getElementById('lang-dropdown');
             const sortDropdown = document.getElementById('sort-key-dropdown');
             const toggleButton = document.getElementById('sort-direction-toggle');
@@ -291,18 +318,12 @@
             setLanguage(currentLang);
 
             langDropdown.addEventListener('change', setLanguage);
-
-            sortDropdown.addEventListener('change', () => {
-                sortRooms();
-            });
-
+            sortDropdown.addEventListener('change', () => { sortRooms(); });
             toggleButton.addEventListener('click', toggleSortDirection);
-
             document.getElementById('refresh-button').addEventListener('click', refreshData);
             
             refreshData(); 
         });
-
     </script>
 </head>
 <body class="p-4 sm:p-6 min-h-screen">
@@ -315,10 +336,18 @@
                 <p id="header-subtitle" class="text-gray-500">Real-time room capacity status. Click refresh to update.</p>
             </div>
             
-            <select id="lang-dropdown" class="text-sm font-semibold rounded-xl px-3 py-2 border border-gray-300 text-gray-800 bg-white shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
-                <option value="en">English</option>
-                <option value="zh">中文</option>
-            </select>
+            <div class="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:space-x-3 items-end">
+                <a href="https://haydenalt.github.io/capacitydashboard/floorview" class="flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold text-sm py-2 px-3 rounded-xl transition duration-200 shadow-sm">
+                    <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 17l10 5 10-5M2 12l10 5 10-5M12 2v20"/>
+                    </svg>
+                    <span id="floor-view-button-text">Floor View Mode</span>
+                </a>
+                <select id="lang-dropdown" class="text-sm font-semibold rounded-xl px-3 py-2 border border-gray-300 text-gray-800 bg-white shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
+                    <option value="en">English</option>
+                    <option value="zh">中文</option>
+                </select>
+            </div>
         </header>
 
         <div class="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
