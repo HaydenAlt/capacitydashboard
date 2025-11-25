@@ -29,7 +29,7 @@
                 'fetching_data': 'Fetching real-time data...',
                 'error_loading': 'Error loading data. Find us in stem lab.',
                 'sort_by': 'Sort By:',
-                'option_id': 'Room ID',
+                'option_default': 'Default',
                 'option_percentage': '% Full',
                 'option_people': 'People',
                 'direction_asc': 'Ascending',
@@ -49,7 +49,7 @@
                 'fetching_data': '正在獲取實時數據...',
                 'error_loading': '載入數據錯誤。請在 stem lab 找到我們。',
                 'sort_by': '排序方式：',
-                'option_id': '房間編號',
+                'option_default': '默認順序',
                 'option_percentage': '佔用百分比',
                 'option_people': '人數',
                 'direction_asc': '升序',
@@ -64,23 +64,23 @@
         };
 
         const STATIC_ROOM_CONFIG = [
-            { room_id: "101", name: "Zenith Boardroom", name_zh: "天頂會議室", max_capacity: 10, floor_label: "1/F" },
-            { room_id: "102", name: "Apollo Meeting Pod", name_zh: "阿波羅會議艙", max_capacity: 5, floor_label: "1/F" },
-            { room_id: "103", name: "Huddle Room 3", name_zh: "會談室 3", max_capacity: 15, floor_label: "1/F" },
-            { room_id: "104", name: "Training Room A", name_zh: "培訓室 A", max_capacity: 30, floor_label: "1/F" },
-            { room_id: "105", name: "Training Room B", name_zh: "培訓室 B", max_capacity: 30, floor_label: "1/F" },
-            { room_id: "203", name: "Jupiter Training Hall", name_zh: "木星培訓大廳", max_capacity: 50, floor_label: "2/F" },
-            { room_id: "205", name: "Quiet Focus Room", name_zh: "安靜專注室", max_capacity: 2, floor_label: "2/F" },
-            { room_id: "301", name: "Innovation Hub", name_zh: "創新中心", max_capacity: 75, floor_label: "3/F" },
-            { room_id: "302", name: "Small Huddle", name_zh: "小型會談室", max_capacity: 4, floor_label: "3/F" },
-            { room_id: "401", name: "Executive Suite", name_zh: "行政套房", max_capacity: 8, floor_label: "4/F" },
+            { room_id: "101", name: "Training Room Alpha", name_zh: "甲級培訓室", max_capacity: 10, floor_label: "1/F" },
+            { room_id: "102", name: "Meeting Room Beta", name_zh: "乙級會議室", max_capacity: 15, floor_label: "1/F" },
+            { room_id: "103", name: "Studio Gamma", name_zh: "丙級工作室", max_capacity: 20, floor_label: "1/F" },
+            { room_id: "104", name: "Lounge Delta", name_zh: "丁級休息室", max_capacity: 25, floor_label: "1/F" },
+            { room_id: "105", name: "Huddle Room Epsilon", name_zh: "戊級討論室", max_capacity: 8, floor_label: "1/F" },
+            { room_id: "Court", name: "Gymnasium Court", name_zh: "體育館", max_capacity: 100, floor_label: "G/F" },
+            { room_id: "G01", name: "Ground Floor Office", name_zh: "地下辦公室", max_capacity: 5, floor_label: "G/F" },
+            { room_id: "LGB", name: "Lower Ground Breakout", name_zh: "地庫分組討論", max_capacity: 10, floor_label: "LG/F" },
+            { room_id: "R01", name: "Rooftop Garden", name_zh: "屋頂花園", max_capacity: 20, floor_label: "R/F" },
+            { room_id: "B01", name: "Basement Server Bay", name_zh: "地下室伺服器機房", max_capacity: 5, floor_label: "B1/F" },
         ];
 
         const API_URL = 'https://haydenalt.github.io/capacitydashboard/data.json';
         const FLOOR_VIEW_URL = 'https://haydenalt.github.io/capacitydashboard/floorview';
 
         let currentRoomData = [];
-        let currentSortKey = 'id';
+        let currentSortKey = 'api_order';
         let currentSortDirection = 'asc'; 
         let currentLang = 'en';
 
@@ -91,61 +91,60 @@
         async function fetchOccupancyData() {
             const response = await fetch(API_URL);
             
-            // Clone the response stream immediately for error logging fallback
-            const clonedResponse = response.clone();
-
             if (!response.ok) {
-                // If the response status is not OK, read the body from the clone for logging
-                const text = await clonedResponse.text();
+                const text = await response.text();
                 console.error("Non-OK response body:", text);
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             
             try {
-                // Attempt to read the original response body as JSON
                 const apiOccupancy = await response.json();
                 if (!Array.isArray(apiOccupancy)) {
                     throw new Error("API response is not an array.");
                 }
                 return apiOccupancy;
             } catch (error) {
-                // If JSON parsing fails, read the raw text from the clone for diagnosis.
-                const text = await clonedResponse.text();
-                console.error("Raw response text (JSON parsing failed):", text);
+                console.error("Critical error during standard JSON parsing:", error);
                 throw new Error(`JSON Parsing Error: ${error.message}`);
             }
         }
-
+        
         function getMergedRoomData(occupancyData) {
-            const occupancyMap = new Map(occupancyData.map(item => [item.room_id, item]));
+            const configMap = new Map(STATIC_ROOM_CONFIG.map(config => [config.room_id, config]));
 
-            return STATIC_ROOM_CONFIG.map(config => {
-                const occupancy = occupancyMap.get(config.room_id);
-                const current_occupancy = occupancy ? occupancy.current_occupancy : 0;
-                
-                const percentage = config.max_capacity > 0 
-                    ? Math.min(100, Math.round((current_occupancy / config.max_capacity) * 100))
-                    : 0;
+            return occupancyData
+                .map((occupancy, index) => {
+                    const config = configMap.get(occupancy.room_id);
 
-                let colorClass = 'bg-gray-100 border-gray-300';
+                    if (!config) return null; 
 
-                if (percentage === 0) {
-                    colorClass = 'bg-green-50 border-green-400';
-                } else if (percentage < 50) {
-                    colorClass = 'bg-green-100 border-green-500';
-                } else if (percentage <= 80) {
-                    colorClass = 'bg-amber-100 border-amber-500';
-                } else {
-                    colorClass = 'bg-red-100 border-red-500';
-                }
+                    const current_occupancy = occupancy.current_occupancy;
+                    
+                    const percentage = config.max_capacity > 0 
+                        ? Math.min(100, Math.round((current_occupancy / config.max_capacity) * 100))
+                        : 0;
 
-                return {
-                    ...config,
-                    current_occupancy,
-                    percentage,
-                    colorClass
-                };
-            });
+                    let colorClass = 'bg-gray-100 border-gray-300';
+
+                    if (percentage === 0) {
+                        colorClass = 'bg-green-50 border-green-400';
+                    } else if (percentage < 50) {
+                        colorClass = 'bg-green-100 border-green-500';
+                    } else if (percentage <= 80) {
+                        colorClass = 'bg-amber-100 border-amber-500';
+                    } else {
+                        colorClass = 'bg-red-100 border-red-500';
+                    }
+
+                    return {
+                        ...config,
+                        current_occupancy,
+                        percentage,
+                        colorClass,
+                        api_index: index
+                    };
+                })
+                .filter(room => room !== null);
         }
 
         function renderRooms(rooms) {
@@ -191,7 +190,7 @@
 
         function getBarColor(percentage) {
             if (percentage < 50) return '#10B981';
-            if (percentage <= 80) return '#F59E0B';
+            if (percentage <= 80) return '#F59E0B'; 
             return '#EF4444';
         }
 
@@ -214,20 +213,21 @@
                     case 'people':
                         valA = a.current_occupancy;
                         valB = b.current_occupancy;
-                        break;
+                        return currentSortDirection === 'asc' ? valA - valB : valB - valA;
+
                     case 'percentage':
                         valA = a.percentage;
                         valB = b.percentage;
-                        break;
-                    case 'id':
-                        return currentSortDirection === 'asc' 
-                            ? a.room_id.localeCompare(b.room_id) 
-                            : b.room_id.localeCompare(a.room_id);
+                        return currentSortDirection === 'asc' ? valA - valB : valB - valA;
+
+                    case 'api_order':
+                        valA = a.api_index;
+                        valB = b.api_index;
+                        return currentSortDirection === 'asc' ? valA - valB : valB - valA; 
+
                     default:
                         return 0;
                 }
-
-                return currentSortDirection === 'asc' ? valA - valB : valB - valA;
             });
 
             renderRooms(currentRoomData);
@@ -266,7 +266,7 @@
                 document.getElementById('sort-by-label').textContent = translate('sort_by');
                 document.getElementById('floor-view-button-text').textContent = translate('floor_view_mode');
 
-                document.querySelector('#sort-key-dropdown option[value="id"]').textContent = translate('option_id');
+                document.querySelector('#sort-key-dropdown option[value="api_order"]').textContent = translate('option_default');
                 document.querySelector('#sort-key-dropdown option[value="percentage"]').textContent = translate('option_percentage');
                 document.querySelector('#sort-key-dropdown option[value="people"]').textContent = translate('option_people');
                 
@@ -345,7 +345,7 @@
                 <span id="sort-by-label" class="text-sm font-medium text-gray-600 self-center hidden sm:block">Sort By:</span>
                 
                 <select id="sort-key-dropdown" class="text-sm font-semibold rounded-xl px-3 py-2 border border-indigo-600 text-indigo-800 bg-white shadow-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
-                    <option value="id">Room ID</option>
+                    <option value="api_order" selected>Default</option> 
                     <option value="percentage">% Full</option>
                     <option value="people">People</option>
                 </select>
