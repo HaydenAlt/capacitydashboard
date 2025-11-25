@@ -84,14 +84,14 @@
     <script>
         const TRANSLATIONS = {
             'en': {
-                'title_list': 'HPCCSS Occupancy Monitor: List View',
+                'title_list': 'Live Occupancy Monitor',
                 'title_floor': 'Interactive Occupancy Monitor',
                 'subtitle_list': 'Real-time room capacity status. Click refresh to update.',
                 'subtitle_floor': 'Select a floor plan and click on a room to view real-time capacity.',
                 'refresh_data': 'Refresh Data',
                 'loading': 'Loading...',
                 'fetching_data': 'Fetching real-time data...',
-                'error_loading': 'Loading Error! T^T',
+                'error_loading': 'Error loading data. Check console.',
                 'sort_by': 'Sort By:',
                 'option_default': 'Default',
                 'option_percentage': '% Full',
@@ -102,14 +102,14 @@
                 'room_id_label': 'Room ID',
                 'capacity_label': 'Capacity',
                 'people_label': 'people',
-                'error_api': 'API Error! T^T',
+                'error_api': 'Error fetching data from API.',
                 'floor_view_mode': 'Floor View',
                 'list_view_mode': 'List View',
                 'select_floor': 'Select Floor:',
                 'room_details': 'Room Details',
                 'no_room_selected': 'Click on a room marker on the map to see its details.',
                 'not_found': 'Room data not found.',
-                'floor_1': '1st Floor (1/F)',
+                'floor_1/F': '1st Floor (1/F)',
                 'current_occupancy': 'Current Occupancy'
             },
             'zh': {
@@ -120,7 +120,7 @@
                 'refresh_data': '刷新數據',
                 'loading': '載入中...',
                 'fetching_data': '正在獲取實時數據...',
-                'error_loading': '載入數據錯誤! 弊傢夥啦!!! T^T',
+                'error_loading': '載入數據錯誤。請在 console 檢查。',
                 'sort_by': '排序方式：',
                 'option_default': '默認順序',
                 'option_percentage': '佔用百分比',
@@ -131,14 +131,14 @@
                 'room_id_label': '房間編號',
                 'capacity_label': '容量',
                 'people_label': '人',
-                'error_api': 'API錯誤! T^T',
+                'error_api': '從 API 獲取數據錯誤。',
                 'floor_view_mode': '樓層視圖',
                 'list_view_mode': '列表視圖',
                 'select_floor': '選擇樓層：',
                 'room_details': '房間詳情',
                 'no_room_selected': '點擊地圖上的房間標記以查看其詳情。',
                 'not_found': '找不到房間數據。',
-                'floor_1': '一樓 (1/F)',
+                'floor_1/F': '一樓 (1/F)',
                 'current_occupancy': '當前佔用人數'
             }
         };
@@ -151,13 +151,14 @@
             { room_id: "105", name: "Huddle Room Epsilon", name_zh: "戊級討論室", max_capacity: 8, floor_label: "1/F", x: 30, y: 60 },
         ];
 
-        const FLOOR_PLANS = {
-            '1/F': {
-                label: '1/F',
-                image: 'https://placehold.co/800x600/add8e6/2c3e50?text=First+Floor+Plan+(1/F)',
-                rooms: ROOM_CONFIG.filter(r => r.floor_label === '1/F'),
-            }
-        };
+        const FLOOR_PLANS_RAW = [
+            {
+                key: '1/F',
+                label_en: '1st Floor (1/F)',
+                label_zh: '一樓 (1/F)',
+                image_url: 'https://placehold.co/800x600/add8e6/2c3e50?text=First+Floor+Plan+(1/F)',
+            },
+        ];
 
         const API_URL = 'https://haydenalt.github.io/capacitydashboard/data.json';
 
@@ -168,6 +169,7 @@
         let currentLang = 'en';
         let currentView = 'list';
         let currentFloor = '1/F';
+        let FLOOR_PLANS = {};
 
         function translate(key) {
             return TRANSLATIONS[currentLang][key] || key;
@@ -487,6 +489,35 @@
             }
         }
 
+        function prepareDataStructures() {
+            const floorPlansMap = new Map();
+            FLOOR_PLANS_RAW.forEach(floor => {
+                floorPlansMap.set(floor.key, {
+                    label: floor.label_en,
+                    image: floor.image_url,
+                    rooms: ROOM_CONFIG.filter(r => r.floor_label === floor.key),
+                });
+            });
+            FLOOR_PLANS = Object.fromEntries(floorPlansMap);
+
+            FLOOR_PLANS_RAW.forEach(floor => {
+                TRANSLATIONS['en'][`floor_${floor.key}`] = floor.label_en;
+                TRANSLATIONS['zh'][`floor_${floor.key}`] = floor.label_zh;
+            });
+
+            const floorDropdown = document.getElementById('floor-dropdown');
+            floorDropdown.innerHTML = '';
+            FLOOR_PLANS_RAW.forEach(floor => {
+                const option = document.createElement('option');
+                option.value = floor.key;
+                option.textContent = translate(`floor_${floor.key}`);
+                if (floor.key === currentFloor) {
+                    option.selected = true;
+                }
+                floorDropdown.appendChild(option);
+            });
+        }
+
         function setLanguage() {
             const newLang = document.getElementById('lang-dropdown').value;
             if (TRANSLATIONS[newLang]) {
@@ -507,7 +538,12 @@
 
                 document.getElementById('floor-select-label').textContent = translate('select_floor');
                 document.getElementById('details-title').textContent = translate('room_details');
-                document.querySelector('#floor-dropdown option[value="1/F"]').textContent = translate('floor_1');
+
+                const floorDropdown = document.getElementById('floor-dropdown');
+                Array.from(floorDropdown.options).forEach(option => {
+                    const floorKey = option.value;
+                    option.textContent = translate(`floor_${floorKey}`);
+                });
 
                 if (currentView === 'list') {
                     renderRooms(currentRoomDataArray);
@@ -554,6 +590,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            prepareDataStructures();
             setLanguage();
             toggleView('list');
 
@@ -633,7 +670,6 @@
                 <span id="floor-select-label" class="text-sm font-medium text-gray-600 self-center">Select Floor:</span>
 
                 <select id="floor-dropdown" class="text-sm font-semibold rounded-xl px-3 py-2 border border-indigo-600 text-indigo-800 bg-white shadow-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
-                    <option value="1/F" selected>1st Floor (1/F)</option>
                 </select>
             </div>
 
