@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HPCCSS Room Capacity Dashboard</title>
+        <script>
+        const TRANSLATIONS = {
+            'English': {
+                'title': 'HPCCSS Room Capacity Dashboard',
+                'subtitle': 'Welcome to ! Created by Data Research Club',
+                'refresh_data': 'Refresh Data',
+                'loading': 'Loading...',
+                'fetching_data': 'Fetching real-time data...',
+                'error_loading': 'Error loading data. Check console.',
+                'sort_by': 'Sort By:',
+                'option_id': 'Room ID',
+                'option_percentage': '% Full',
+                'option_people': 'People',
+                'direction_asc': 'Ascending',
+                'direction_desc': 'Descending',
+                'floor': 'Floor',
+                'room_id_label': 'Room ID',
+                'capacity_label': 'Capacity',
+                'people_label': 'people'
+            },
+            'Chinese': {
+                'title': 'HPCCSS 房間佔用監控',
+                'subtitle': '實時房間容量狀態。點擊刷新即可更新。',
+                'refresh_data': '刷新',
+                'loading': '載入中...',
+                'fetching_data': '正在獲取實時數據...',
+                'error_loading': '載入數據錯誤。>_<',
+                'sort_by': '排序方式：',
+                'option_id': '房間編號',
+                'option_percentage': '佔用百分比',
+                'option_people': '人數',
+                'direction_asc': '',
+                'direction_desc': '降序',
+                'floor': '樓層',
+                'room_id_label': '房間編號',
+                'capacity_label': '容量',
+                'people_label': '人'
+            }
+        };
+
+        const STATIC_ROOM_CONFIG = [
+            { room_id: "101", name: "Zenith Boardroom", name_zh: "天頂會議室", max_capacity: 10, floor_label: "1/F" },
+            { room_id: "102", name: "Apollo Meeting Pod", name_zh: "阿波羅會議艙", max_capacity: 5, floor_label: "1/F" },
+            { room_id: "203", name: "Jupiter Training Hall", name_zh: "木星培訓大廳", max_capacity: 50, floor_label: "2/F" },
+            { room_id: "205", name: "Quiet Focus Room", name_zh: "安靜專注室", max_capacity: 2, floor_label: "2/F" },
+            { room_id: "301", name: "Innovation Hub", name_zh: "創新中心", max_capacity: 75, floor_label: "3/F" },
+            { room_id: "302", name: "Small Huddle", name_zh: "小型會談室", max_capacity: 4, floor_label: "3/F" },
+            { room_id: "401", name: "Executive Suite", name_zh: "行政套房", max_capacity: 8, floor_label: "4/F" },
+        ];
+
+        let currentRoomData = [];
+        let currentSortKey = 'id';
+        let currentSortDirection = 'asc'; 
+        let currentLang = 'English';
+
+        function translate(key) {
+            return TRANSLATIONS[currentLang][key] || key;
+        }
+
+        async function fetchOccupancyData() {
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const mockOccupancy = [
+                { "room_id": "101", "current_occupancy": 5, "timestamp": Date.now() / 1000 - 100 },
+                { "room_id": "102", "current_occupancy": 3, "timestamp": Date.now() / 1000 - 90 },
+            ];
+
+            STATIC_ROOM_CONFIG.forEach(config => {
+                if (!mockOccupancy.find(o => o.room_id === config.room_id)) {
+                    const occupancy = Math.floor(Math.random() * (config.max_capacity + 1));
+                    mockOccupancy.push({
+                        room_id: config.room_id,
+                        current_occupancy: occupancy,
+                        timestamp: Date.now() / 1000 - Math.floor(Math.random() * 50)
+                    });
+                }
+            });
+
+            return mockOccupancy;
+        }
+
+        function getMergedRoomData(occupancyData) {
+            const occupancyMap = new Map(occupancyData.map(item => [item.room_id, item]));
+
+            return STATIC_ROOM_CONFIG.map(config => {
+                const occupancy = occupancyMap.get(config.room_id);
+                const current_occupancy = occupancy ? occupancy.current_occupancy : 0;
+                const percentage = config.max_capacity > 0 
+                    ? Math.min(100, Math.round((current_occupancy / config.max_capacity) * 100))
+                    : 0;
+
+                let colorClass = 'bg-gray-100 border-gray-300';
+
+                if (percentage === 0) {
+                    colorClass = 'bg-green-50 border-green-400';
+                } else if (percentage < 50) {
+                    colorClass = 'bg-green-100 border-green-500';
+                } else if (percentage <= 80) {
+                    colorClass = 'bg-amber-100 border-amber-500';
+                } else {
+                    colorClass = 'bg-red-100 border-red-500';
+                }
+
+                return {
+                    ...config,
+                    current_occupancy,
+                    percentage,
+                    colorClass,
+                    timestamp: occupancy ? occupancy.timestamp : null
+                };
+            });
+        }
+
+        function renderRooms(rooms) {
+            const listContainer = document.getElementById('room-list');
+            listContainer.innerHTML = '';
+            
+            const roomNameKey = currentLang === 'zh' ? 'name_zh' : 'name';
+            const t = TRANSLATIONS[currentLang];
+
+            rooms.forEach(room => {
+                const listItem = document.createElement('div');
+                listItem.className = `p-4 mb-3 rounded-xl shadow-md transition-all duration-300 ease-in-out ${room.colorClass} border-l-4`;
+                
+                const roomName = room[roomNameKey] || room.name;
+
+                listItem.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex-grow">
+                            <h2 class="text-lg font-bold text-gray-800">${roomName}</h2>
+                            <p class="text-sm text-gray-500">
+                                ${t.floor}: ${room.floor_label} | ${t.room_id_label}: ${room.room_id} | ${t.capacity_label}: ${room.max_capacity}
+                            </p>
+                        </div>
+                        <div class="flex-shrink-0 ml-4 text-right">
+                            <p class="text-2xl font-extrabold text-gray-900">${room.percentage}%</p>
+                            <p class="text-sm text-gray-600">${room.current_occupancy} ${t.people_label}</p>
+                        </div>
+                    </div>
+                    <div class="w-full h-2 mt-3 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                            class="h-full rounded-full transition-all duration-500" 
+                            style="width: ${room.percentage}%; background-color: ${getBarColor(room.percentage)};"
+                            >
+                        </div>
+                    </div>
+                `;
+                listContainer.appendChild(listItem);
+            });
+            if (rooms.length === 0) {
+                 listContainer.innerHTML = `<div class="text-center text-gray-500 py-8">${translate('fetching_data')}</div>`;
+            }
+        }
+
+        function getBarColor(percentage) {
+            if (percentage < 50) return '#10B981';
+            if (percentage <= 80) return '#F59E0B';
+            return '#EF4444';
+        }
+
+        function sortRooms(optionalKey = null) {
+            const dropdown = document.getElementById('sort-key-dropdown');
+            const newKey = dropdown.value;
+
+            if (optionalKey && optionalKey !== currentSortKey) {
+                currentSortKey = optionalKey;
+            } else if (newKey !== currentSortKey) {
+                currentSortKey = newKey;
+            }
+
+            updateSortControlsUI(currentSortKey, currentSortDirection);
+
+            currentRoomData.sort((a, b) => {
+                let valA, valB;
+
+                switch (currentSortKey) {
+                    case 'people':
+                        valA = a.current_occupancy;
+                        valB = b.current_occupancy;
+                        break;
+                    case 'percentage':
+                        valA = a.percentage;
+                        valB = b.percentage;
+                        break;
+                    case 'id':
+                        return currentSortDirection === 'asc' 
+                            ? a.room_id.localeCompare(b.room_id) 
+                            : b.room_id.localeCompare(a.room_id);
+                    default:
+                        return 0;
+                }
+
+                return currentSortDirection === 'asc' ? valA - valB : valB - valA;
+            });
+
+            renderRooms(currentRoomData);
+        }
+
+        function toggleSortDirection() {
+            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            sortRooms(currentSortKey); 
+        }
+
+        function updateSortControlsUI(key, direction) {
+            const dropdown = document.getElementById('sort-key-dropdown');
+            dropdown.value = key;
+
+            const icon = document.getElementById('direction-icon');
+            const text = document.getElementById('direction-text');
+
+            if (direction === 'asc') {
+                text.textContent = translate('direction_asc');
+                icon.style.transform = 'rotate(180deg)'; 
+            } else {
+                text.textContent = translate('direction_desc');
+                icon.style.transform = 'rotate(0deg)'; 
+            }
+        }
+
+        function setLanguage(lang) {
+            const newLang = document.getElementById('lang-dropdown').value;
+            if (TRANSLATIONS[newLang]) {
+                currentLang = newLang;
+                
+                document.getElementById('header-title').textContent = translate('title');
+                document.getElementById('header-subtitle').textContent = translate('subtitle');
+                document.getElementById('refresh-button-text').textContent = translate('refresh_data');
+                document.getElementById('loading-indicator').textContent = translate('loading');
+                document.getElementById('sort-by-label').textContent = translate('sort_by');
+
+                document.querySelector('#sort-key-dropdown option[value="id"]').textContent = translate('option_id');
+                document.querySelector('#sort-key-dropdown option[value="percentage"]').textContent = translate('option_percentage');
+                document.querySelector('#sort-key-dropdown option[value="people"]').textContent = translate('option_people');
+                
+                updateSortControlsUI(currentSortKey, currentSortDirection);
+                renderRooms(currentRoomData);
+            }
+        }
+
+        async function refreshData() {
+            const refreshButton = document.getElementById('refresh-button');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const listContainer = document.getElementById('room-list');
+
+            refreshButton.disabled = true;
+            loadingIndicator.classList.remove('hidden');
+            
+            listContainer.innerHTML = `<div class="text-center text-gray-500 py-8">${translate('fetching_data')}</div>`;
+
+            try {
+                const occupancyData = await fetchOccupancyData();
+                currentRoomData = getMergedRoomData(occupancyData);
+                
+                sortRooms(currentSortKey); 
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                listContainer.innerHTML = `<div class="text-center text-red-500 py-8 font-semibold">${translate('error_loading')}</div>`;
+            } finally {
+                refreshButton.disabled = false;
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            const langDropdown = document.getElementById('lang-dropdown');
+            const sortDropdown = document.getElementById('sort-key-dropdown');
+            const toggleButton = document.getElementById('sort-direction-toggle');
+
+            setLanguage(currentLang);
+
+            langDropdown.addEventListener('change', setLanguage);
+
+            sortDropdown.addEventListener('change', () => {
+                sortRooms();
+            });
+
+            toggleButton.addEventListener('click', toggleSortDirection);
+
+            document.getElementById('refresh-button').addEventListener('click', refreshData);
+            
+            refreshData(); 
+        });
+
+    </script>
+</head>
