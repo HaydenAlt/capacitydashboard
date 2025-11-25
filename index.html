@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HPCCSS Room Capacity Dashboard</title>
+    <title>HPCCSS Room Capacity Dashboard - Merged View</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
@@ -18,16 +18,80 @@
             background-color: #a0aec0;
             border-radius: 4px;
         }
+        .floor-plan-container {
+            position: relative;
+            max-width: 100%;
+            height: auto;
+            margin: 0 auto;
+        }
+        .floor-plan {
+            width: 100%;
+            height: auto;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .room-marker {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid white;
+            transition: all 0.2s ease-in-out;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+        }
+        .room-marker:hover {
+            transform: translate(-50%, -50%) scale(1.2);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.8), 0 0 10px var(--marker-color);
+            z-index: 10;
+        }
+        .room-marker-blink {
+            animation: pulse-border 1.5s infinite;
+        }
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+        }
+        .view-toggle-button {
+            color: #4B5563;
+            background-color: #E5E7EB;
+            border: none;
+            padding: 8px 12px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            border-radius: 0.75rem;
+            transition-duration: 200ms;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .view-toggle-button:hover {
+            background-color: #D1D5DB;
+        }
+        .view-toggle-button.active {
+            color: #ffffff;
+            background-color: #4F46E5;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        }
+        .view-toggle-button.active:hover {
+             background-color: #4338CA;
+        }
     </style>
     <script>
         const TRANSLATIONS = {
             'en': {
-                'title': 'Live Occupancy Monitor',
-                'subtitle': 'Real-time room capacity status. Click refresh to update.',
+                'title_list': 'Live Occupancy Monitor',
+                'title_floor': 'Interactive Occupancy Monitor',
+                'subtitle_list': 'Real-time room capacity status. Click refresh to update.',
+                'subtitle_floor': 'Select a floor plan and click on a room to view real-time capacity.',
                 'refresh_data': 'Refresh Data',
                 'loading': 'Loading...',
                 'fetching_data': 'Fetching real-time data...',
-                'error_loading': 'Error loading data. Find us in stem lab.',
+                'error_loading': 'Error loading data. Check console.',
                 'sort_by': 'Sort By:',
                 'option_default': 'Default',
                 'option_percentage': '% Full',
@@ -39,15 +103,24 @@
                 'capacity_label': 'Capacity',
                 'people_label': 'people',
                 'error_api': 'Error fetching data from API.',
-                'floor_view_mode': 'Floor View Mode'
+                'floor_view_mode': 'Floor View',
+                'list_view_mode': 'List View',
+                'select_floor': 'Select Floor:',
+                'room_details': 'Room Details',
+                'no_room_selected': 'Click on a room marker on the map to see its details.',
+                'not_found': 'Room data not found.',
+                'floor_1': '1st Floor (1/F)',
+                'current_occupancy': 'Current Occupancy'
             },
             'zh': {
-                'title': '實時房間佔用監控',
-                'subtitle': '實時房間容量狀態。點擊刷新即可更新。',
+                'title_list': '實時房間佔用監控',
+                'title_floor': '互動佔用監控',
+                'subtitle_list': '實時房間容量狀態。點擊刷新即可更新。',
+                'subtitle_floor': '選擇樓層平面圖並點擊房間以查看實時容量。',
                 'refresh_data': '刷新數據',
                 'loading': '載入中...',
                 'fetching_data': '正在獲取實時數據...',
-                'error_loading': '載入數據錯誤。請在 stem lab 找到我們。',
+                'error_loading': '載入數據錯誤。請在 console 檢查。',
                 'sort_by': '排序方式：',
                 'option_default': '默認順序',
                 'option_percentage': '佔用百分比',
@@ -59,44 +132,79 @@
                 'capacity_label': '容量',
                 'people_label': '人',
                 'error_api': '從 API 獲取數據錯誤。',
-                'floor_view_mode': '樓層視圖模式'
+                'floor_view_mode': '樓層視圖',
+                'list_view_mode': '列表視圖',
+                'select_floor': '選擇樓層：',
+                'room_details': '房間詳情',
+                'no_room_selected': '點擊地圖上的房間標記以查看其詳情。',
+                'not_found': '找不到房間數據。',
+                'floor_1': '一樓 (1/F)',
+                'current_occupancy': '當前佔用人數'
             }
         };
 
-        const STATIC_ROOM_CONFIG = [
-            { room_id: "101", name: "Training Room Alpha", name_zh: "甲級培訓室", max_capacity: 10, floor_label: "1/F" },
-            { room_id: "102", name: "Meeting Room Beta", name_zh: "乙級會議室", max_capacity: 15, floor_label: "1/F" },
-            { room_id: "103", name: "Studio Gamma", name_zh: "丙級工作室", max_capacity: 20, floor_label: "1/F" },
-            { room_id: "104", name: "Lounge Delta", name_zh: "丁級休息室", max_capacity: 25, floor_label: "1/F" },
-            { room_id: "105", name: "Huddle Room Epsilon", name_zh: "戊級討論室", max_capacity: 8, floor_label: "1/F" },
-            { room_id: "Court", name: "Gymnasium Court", name_zh: "體育館", max_capacity: 100, floor_label: "G/F" },
-            { room_id: "G01", name: "Ground Floor Office", name_zh: "地下辦公室", max_capacity: 5, floor_label: "G/F" },
-            { room_id: "LGB", name: "Lower Ground Breakout", name_zh: "地庫分組討論", max_capacity: 10, floor_label: "LG/F" },
-            { room_id: "R01", name: "Rooftop Garden", name_zh: "屋頂花園", max_capacity: 20, floor_label: "R/F" },
-            { room_id: "B01", name: "Basement Server Bay", name_zh: "地下室伺服器機房", max_capacity: 5, floor_label: "B1/F" },
+        const ROOM_CONFIG = [
+            { room_id: "101", name: "Training Room Alpha", name_zh: "甲級培訓室", max_capacity: 10, floor_label: "1/F", x: 15, y: 20 },
+            { room_id: "102", name: "Meeting Room Beta", name_zh: "乙級會議室", max_capacity: 15, floor_label: "1/F", x: 40, y: 15 },
+            { room_id: "103", name: "Studio Gamma", name_zh: "丙級工作室", max_capacity: 20, floor_label: "1/F", x: 70, y: 25 },
+            { room_id: "104", name: "Lounge Delta", name_zh: "丁級休息室", max_capacity: 25, floor_label: "1/F", x: 85, y: 55 },
+            { room_id: "105", name: "Huddle Room Epsilon", name_zh: "戊級討論室", max_capacity: 8, floor_label: "1/F", x: 30, y: 60 },
         ];
 
-        const API_URL = 'https://haydenalt.github.io/capacitydashboard/data.json';
-        const FLOOR_VIEW_URL = 'https://haydenalt.github.io/capacitydashboard/floorview';
+        const FLOOR_PLANS = {
+            '1/F': {
+                label: '1/F',
+                image: 'https://placehold.co/800x600/add8e6/2c3e50?text=First+Floor+Plan+(1/F)',
+                rooms: ROOM_CONFIG.filter(r => r.floor_label === '1/F'),
+            }
+        };
 
-        let currentRoomData = [];
+        const API_URL = 'https://haydenalt.github.io/capacitydashboard/data.json';
+
+        let currentMergedRoomData = new Map();
+        let currentRoomDataArray = [];
         let currentSortKey = 'api_order';
-        let currentSortDirection = 'asc'; 
+        let currentSortDirection = 'asc';
         let currentLang = 'en';
+        let currentView = 'list';
+        let currentFloor = '1/F';
 
         function translate(key) {
             return TRANSLATIONS[currentLang][key] || key;
         }
 
+        function getBarColor(percentage) {
+            if (percentage < 50) return '#10B981';
+            if (percentage <= 80) return '#F59E0B';
+            return '#EF4444';
+        }
+
+        function getMarkerColor(percentage) {
+            if (percentage < 50) return 'rgb(16, 185, 129)';
+            if (percentage <= 80) return 'rgb(245, 158, 11)';
+            return 'rgb(239, 68, 68)';
+        }
+
+        function getCardColorClass(percentage) {
+            if (percentage === 0) {
+                return 'bg-green-50 border-green-400';
+            } else if (percentage < 50) {
+                return 'bg-green-100 border-green-500';
+            } else if (percentage <= 80) {
+                return 'bg-amber-100 border-amber-500';
+            } else {
+                return 'bg-red-100 border-red-500';
+            }
+        }
+
         async function fetchOccupancyData() {
             const response = await fetch(API_URL);
-            
+
             if (!response.ok) {
                 const text = await response.text();
-                console.error("Non-OK response body:", text);
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(`HTTP error! status: ${response.status} - ${text}`);
             }
-            
+
             try {
                 const apiOccupancy = await response.json();
                 if (!Array.isArray(apiOccupancy)) {
@@ -104,60 +212,57 @@
                 }
                 return apiOccupancy;
             } catch (error) {
-                console.error("Critical error during standard JSON parsing:", error);
                 throw new Error(`JSON Parsing Error: ${error.message}`);
             }
         }
-        
-        function getMergedRoomData(occupancyData) {
-            const configMap = new Map(STATIC_ROOM_CONFIG.map(config => [config.room_id, config]));
 
-            return occupancyData
-                .map((occupancy, index) => {
-                    const config = configMap.get(occupancy.room_id);
+        function mergeData(occupancyData) {
+            const newRoomDataMap = new Map();
+            const newRoomDataArray = [];
+            const configMap = new Map(ROOM_CONFIG.map(config => [config.room_id, config]));
 
-                    if (!config) return null; 
+            occupancyData.forEach((occupancy, index) => {
+                const config = configMap.get(occupancy.room_id);
 
+                if (config) {
                     const current_occupancy = occupancy.current_occupancy;
-                    
-                    const percentage = config.max_capacity > 0 
+                    const percentage = config.max_capacity > 0
                         ? Math.min(100, Math.round((current_occupancy / config.max_capacity) * 100))
                         : 0;
 
-                    let colorClass = 'bg-gray-100 border-gray-300';
-
-                    if (percentage === 0) {
-                        colorClass = 'bg-green-50 border-green-400';
-                    } else if (percentage < 50) {
-                        colorClass = 'bg-green-100 border-green-500';
-                    } else if (percentage <= 80) {
-                        colorClass = 'bg-amber-100 border-amber-500';
-                    } else {
-                        colorClass = 'bg-red-100 border-red-500';
-                    }
-
-                    return {
+                    const merged = {
                         ...config,
                         current_occupancy,
                         percentage,
-                        colorClass,
+                        color: getMarkerColor(percentage),
+                        colorClass: getCardColorClass(percentage),
                         api_index: index
                     };
-                })
-                .filter(room => room !== null);
+                    newRoomDataMap.set(occupancy.room_id, merged);
+                    newRoomDataArray.push(merged);
+                }
+            });
+            currentMergedRoomData = newRoomDataMap;
+            currentRoomDataArray = newRoomDataArray;
+
+            if (currentView === 'list') {
+                sortRooms(currentSortKey);
+            } else {
+                renderFloor(currentFloor);
+            }
         }
 
         function renderRooms(rooms) {
             const listContainer = document.getElementById('room-list');
             listContainer.innerHTML = '';
-            
+
             const roomNameKey = currentLang === 'zh' ? 'name_zh' : 'name';
             const t = TRANSLATIONS[currentLang];
 
             rooms.forEach(room => {
                 const listItem = document.createElement('div');
                 listItem.className = `p-4 mb-3 rounded-xl shadow-md transition-all duration-300 ease-in-out ${room.colorClass} border-l-4`;
-                
+
                 const roomName = room[roomNameKey] || room.name;
 
                 listItem.innerHTML = `
@@ -174,8 +279,8 @@
                         </div>
                     </div>
                     <div class="w-full h-2 mt-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                            class="h-full rounded-full transition-all duration-500" 
+                        <div
+                            class="h-full rounded-full transition-all duration-500"
                             style="width: ${room.percentage}%; background-color: ${getBarColor(room.percentage)};"
                             >
                         </div>
@@ -188,25 +293,17 @@
             }
         }
 
-        function getBarColor(percentage) {
-            if (percentage < 50) return '#10B981';
-            if (percentage <= 80) return '#F59E0B'; 
-            return '#EF4444';
-        }
-
         function sortRooms(optionalKey = null) {
             const dropdown = document.getElementById('sort-key-dropdown');
-            const newKey = dropdown.value;
+            const newKey = optionalKey || dropdown.value;
 
-            if (optionalKey && optionalKey !== currentSortKey) {
-                currentSortKey = optionalKey;
-            } else if (newKey !== currentSortKey) {
+            if (newKey !== currentSortKey) {
                 currentSortKey = newKey;
             }
 
             updateSortControlsUI(currentSortKey, currentSortDirection);
 
-            currentRoomData.sort((a, b) => {
+            currentRoomDataArray.sort((a, b) => {
                 let valA, valB;
 
                 switch (currentSortKey) {
@@ -223,19 +320,19 @@
                     case 'api_order':
                         valA = a.api_index;
                         valB = b.api_index;
-                        return currentSortDirection === 'asc' ? valA - valB : valB - valA; 
+                        return currentSortDirection === 'asc' ? valA - valB : valB - valA;
 
                     default:
                         return 0;
                 }
             });
 
-            renderRooms(currentRoomData);
+            renderRooms(currentRoomDataArray);
         }
 
         function toggleSortDirection() {
             currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
-            sortRooms(currentSortKey); 
+            sortRooms(currentSortKey);
         }
 
         function updateSortControlsUI(key, direction) {
@@ -247,31 +344,178 @@
 
             if (direction === 'asc') {
                 text.textContent = translate('direction_asc');
-                icon.style.transform = 'rotate(180deg)'; 
+                icon.style.transform = 'rotate(180deg)';
             } else {
                 text.textContent = translate('direction_desc');
-                icon.style.transform = 'rotate(0deg)'; 
+                icon.style.transform = 'rotate(0deg)';
             }
         }
 
-        function setLanguage(lang) {
+        function renderFloor(floorKey) {
+            currentFloor = floorKey;
+            const floorPlanData = FLOOR_PLANS[floorKey];
+            const mapContainer = document.getElementById('map-container');
+
+            if (!mapContainer) return;
+
+            mapContainer.innerHTML = `
+                <img id="floor-plan-image" src="${floorPlanData.image}" alt="${floorKey} Floor Plan" class="floor-plan" />
+                <div id="room-markers"></div>
+            `;
+
+            const markerContainer = document.getElementById('room-markers');
+
+            floorPlanData.rooms.forEach(roomConfig => {
+                const roomData = currentMergedRoomData.get(roomConfig.room_id);
+                if (!roomData) return;
+
+                const marker = document.createElement('div');
+                marker.className = 'room-marker';
+                marker.id = `marker-${roomConfig.room_id}`;
+                marker.style.left = `${roomConfig.x}%`;
+                marker.style.top = `${roomConfig.y}%`;
+                marker.style.backgroundColor = roomData.color;
+                marker.style.setProperty('--marker-color', roomData.color);
+                marker.title = `${currentLang === 'zh' ? roomData.name_zh : roomData.name} (${roomData.percentage}%)`;
+
+                marker.addEventListener('click', () => {
+                    displayRoomDetails(roomConfig.room_id);
+                });
+
+                markerContainer.appendChild(marker);
+            });
+
+            const selectedRoomId = mapContainer.dataset.selectedRoom;
+            if (selectedRoomId) {
+                displayRoomDetails(selectedRoomId);
+            } else {
+                displayRoomDetails(null);
+            }
+        }
+
+        function displayRoomDetails(roomId) {
+            const detailsCard = document.getElementById('room-details-card');
+            const mapContainer = document.getElementById('map-container');
+            const t = TRANSLATIONS[currentLang];
+
+            if (!detailsCard || !mapContainer) return;
+
+            document.querySelectorAll('.room-marker').forEach(m => m.classList.remove('room-marker-blink'));
+
+            if (!roomId || !currentMergedRoomData.has(roomId)) {
+                detailsCard.innerHTML = `<p class="p-6 text-center text-gray-500">${t.no_room_selected}</p>`;
+                mapContainer.dataset.selectedRoom = '';
+                return;
+            }
+
+            const room = currentMergedRoomData.get(roomId);
+            const roomName = currentLang === 'zh' ? room.name_zh : room.name;
+
+            const marker = document.getElementById(`marker-${roomId}`);
+            if(marker) {
+                 marker.classList.add('room-marker-blink');
+            }
+
+            mapContainer.dataset.selectedRoom = roomId;
+
+            const barColor = getBarColor(room.percentage);
+
+            detailsCard.innerHTML = `
+                <div class="p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">${roomName}</h2>
+
+                    <div class="grid grid-cols-2 gap-y-2 mb-6 text-lg">
+                        <div class="text-gray-500">${t.floor}:</div>
+                        <div class="text-gray-800 font-semibold">${room.floor_label}</div>
+
+                        <div class="text-gray-500">${t.room_id_label}:</div>
+                        <div class="text-gray-800 font-semibold">${room.room_id}</div>
+
+                        <div class="text-gray-500">${t.capacity_label}:</div>
+                        <div class="text-gray-800 font-semibold">${room.max_capacity} ${t.people_label}</div>
+                    </div>
+
+                    <div class="flex flex-col space-y-3">
+                        <div class="flex justify-between items-center">
+                            <div class="text-xl font-medium text-gray-700">
+                                ${t.current_occupancy}:
+                                <span class="text-3xl font-extrabold" style="color: ${barColor};">${room.current_occupancy}</span>
+                                /${room.max_capacity}
+                            </div>
+                            <div class="text-3xl font-extrabold text-gray-900 bg-gray-100 px-3 py-1 rounded-lg">${room.percentage}%</div>
+                        </div>
+
+                        <div class="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                                class="h-full rounded-full transition-all duration-500"
+                                style="width: ${room.percentage}%; background-color: ${barColor};"
+                            ></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleView(view) {
+            currentView = view;
+            const listContainer = document.getElementById('list-view-container');
+            const floorContainer = document.getElementById('floor-view-container');
+            const listControls = document.getElementById('list-view-controls');
+            const floorControls = document.getElementById('floor-view-controls');
+
+            const headerTitle = document.getElementById('header-title');
+            const headerSubtitle = document.getElementById('header-subtitle');
+            headerTitle.textContent = translate(view === 'list' ? 'title_list' : 'title_floor');
+            headerSubtitle.textContent = translate(view === 'list' ? 'subtitle_list' : 'subtitle_floor');
+
+            if (view === 'list') {
+                listContainer.classList.remove('hidden');
+                listControls.classList.remove('hidden');
+                floorContainer.classList.add('hidden');
+                floorControls.classList.add('hidden');
+                document.getElementById('list-view-toggle-button').classList.add('active');
+                document.getElementById('floor-view-toggle-button').classList.remove('active');
+                sortRooms(currentSortKey);
+            } else {
+                listContainer.classList.add('hidden');
+                listControls.classList.add('hidden');
+                floorContainer.classList.remove('hidden');
+                floorControls.classList.remove('hidden');
+                document.getElementById('list-view-toggle-button').classList.remove('active');
+                document.getElementById('floor-view-toggle-button').classList.add('active');
+                renderFloor(currentFloor);
+            }
+        }
+
+        function setLanguage() {
             const newLang = document.getElementById('lang-dropdown').value;
             if (TRANSLATIONS[newLang]) {
                 currentLang = newLang;
-                
-                document.getElementById('header-title').textContent = translate('title');
-                document.getElementById('header-subtitle').textContent = translate('subtitle');
+
+                toggleView(currentView);
                 document.getElementById('refresh-button-text').textContent = translate('refresh_data');
                 document.getElementById('loading-indicator').textContent = translate('loading');
-                document.getElementById('sort-by-label').textContent = translate('sort_by');
-                document.getElementById('floor-view-button-text').textContent = translate('floor_view_mode');
 
+                document.getElementById('floor-view-button-text').textContent = translate('floor_view_mode');
+                document.getElementById('list-view-button-text').textContent = translate('list_view_mode');
+
+                document.getElementById('sort-by-label').textContent = translate('sort_by');
                 document.querySelector('#sort-key-dropdown option[value="api_order"]').textContent = translate('option_default');
                 document.querySelector('#sort-key-dropdown option[value="percentage"]').textContent = translate('option_percentage');
                 document.querySelector('#sort-key-dropdown option[value="people"]').textContent = translate('option_people');
-                
                 updateSortControlsUI(currentSortKey, currentSortDirection);
-                renderRooms(currentRoomData);
+
+                document.getElementById('floor-select-label').textContent = translate('select_floor');
+                document.getElementById('details-title').textContent = translate('room_details');
+                document.querySelector('#floor-dropdown option[value="1/F"]').textContent = translate('floor_1');
+
+                if (currentView === 'list') {
+                    renderRooms(currentRoomDataArray);
+                } else {
+                    renderFloor(currentFloor);
+                    const selectedRoomId = document.getElementById('map-container').dataset.selectedRoom;
+                    displayRoomDetails(selectedRoomId);
+                }
             }
         }
 
@@ -279,20 +523,30 @@
             const refreshButton = document.getElementById('refresh-button');
             const loadingIndicator = document.getElementById('loading-indicator');
             const listContainer = document.getElementById('room-list');
+            const mapContainer = document.getElementById('map-container');
 
             refreshButton.disabled = true;
             loadingIndicator.classList.remove('hidden');
-            
-            listContainer.innerHTML = `<div class="text-center text-gray-500 py-8">${translate('fetching_data')}</div>`;
+
+            const loadingMessage = `<div class="text-center text-gray-500 py-8">${translate('fetching_data')}</div>`;
+
+            if (currentView === 'list') {
+                listContainer.innerHTML = loadingMessage;
+            } else {
+                 mapContainer.innerHTML = loadingMessage;
+                 document.getElementById('room-details-card').innerHTML = `<p class="p-6 text-center text-gray-500">${translate('no_room_selected')}</p>`;
+            }
 
             try {
                 const occupancyData = await fetchOccupancyData();
-                currentRoomData = getMergedRoomData(occupancyData);
-                
-                sortRooms(currentSortKey); 
+                mergeData(occupancyData);
             } catch (error) {
-                console.error("Critical error during data processing:", translate('error_api'), error);
-                listContainer.innerHTML = `<div class="text-center text-red-500 py-8 font-semibold">${translate('error_loading')}</div>`;
+                const errorMessage = `<div class="text-center text-red-500 py-8 font-semibold">${translate('error_loading')}</div>`;
+                if (currentView === 'list') {
+                    listContainer.innerHTML = errorMessage;
+                } else {
+                    mapContainer.innerHTML = errorMessage;
+                }
             } finally {
                 refreshButton.disabled = false;
                 loadingIndicator.classList.add('hidden');
@@ -300,38 +554,56 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            const langDropdown = document.getElementById('lang-dropdown');
-            const sortDropdown = document.getElementById('sort-key-dropdown');
-            const toggleButton = document.getElementById('sort-direction-toggle');
+            setLanguage();
+            toggleView('list');
 
-            setLanguage(currentLang);
+            document.getElementById('sort-key-dropdown').addEventListener('change', () => { sortRooms(); });
+            document.getElementById('sort-direction-toggle').addEventListener('click', toggleSortDirection);
 
-            langDropdown.addEventListener('change', setLanguage);
-            sortDropdown.addEventListener('change', () => { sortRooms(); });
-            toggleButton.addEventListener('click', toggleSortDirection);
+            document.getElementById('floor-dropdown').addEventListener('change', (e) => {
+                renderFloor(e.target.value);
+            });
+
+            document.getElementById('lang-dropdown').addEventListener('change', setLanguage);
             document.getElementById('refresh-button').addEventListener('click', refreshData);
-            
-            refreshData(); 
+            document.getElementById('list-view-toggle-button').addEventListener('click', () => toggleView('list'));
+            document.getElementById('floor-view-toggle-button').addEventListener('click', () => toggleView('floor'));
+
+            refreshData();
         });
     </script>
 </head>
 <body class="p-4 sm:p-6 min-h-screen">
 
     <div class="max-w-4xl mx-auto">
-        
+
         <header class="mb-6 border-b pb-4 flex justify-between items-start">
             <div>
                 <h1 id="header-title" class="text-3xl font-extrabold text-gray-900 mb-1">Live Occupancy Monitor</h1>
                 <p id="header-subtitle" class="text-gray-500">Real-time room capacity status. Click refresh to update.</p>
             </div>
-            
+
             <div class="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:space-x-3 items-end">
-                <a href="https://haydenalt.github.io/capacitydashboard/floorview" class="flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold text-sm py-2 px-3 rounded-xl transition duration-200 shadow-sm">
-                    <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M2 17l10 5 10-5M2 12l10 5 10-5M12 2v20"/>
-                    </svg>
-                    <span id="floor-view-button-text">Floor View Mode</span>
-                </a>
+                <div class="flex space-x-2">
+                    <button id="list-view-toggle-button" class="view-toggle-button active">
+                        <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="8" y1="6" x2="21" y2="6"></line>
+                            <line x1="8" y1="12" x2="21" y2="12"></line>
+                            <line x1="8" y1="18" x2="21" y2="18"></line>
+                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                        </svg>
+                        <span id="list-view-button-text">List View</span>
+                    </button>
+                    <button id="floor-view-toggle-button" class="view-toggle-button">
+                        <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M2 17l10 5 10-5M2 12l10 5 10-5M12 2v20"/>
+                        </svg>
+                        <span id="floor-view-button-text">Floor View</span>
+                    </button>
+                </div>
+
                 <select id="lang-dropdown" class="text-sm font-semibold rounded-xl px-3 py-2 border border-gray-300 text-gray-800 bg-white shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
                     <option value="en">English</option>
                     <option value="zh">中文</option>
@@ -339,13 +611,12 @@
             </div>
         </header>
 
-        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
-            
-            <div class="flex space-x-2 w-full sm:w-auto items-center">
+        <div id="dynamic-controls" class="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
+             <div id="list-view-controls" class="flex space-x-2 w-full sm:w-auto items-center hidden">
                 <span id="sort-by-label" class="text-sm font-medium text-gray-600 self-center hidden sm:block">Sort By:</span>
-                
+
                 <select id="sort-key-dropdown" class="text-sm font-semibold rounded-xl px-3 py-2 border border-indigo-600 text-indigo-800 bg-white shadow-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
-                    <option value="api_order" selected>Default</option> 
+                    <option value="api_order" selected>Default</option>
                     <option value="percentage">% Full</option>
                     <option value="people">People</option>
                 </select>
@@ -357,7 +628,15 @@
                     </svg>
                 </button>
             </div>
-            
+
+            <div id="floor-view-controls" class="flex space-x-2 w-full sm:w-auto items-center hidden">
+                <span id="floor-select-label" class="text-sm font-medium text-gray-600 self-center">Select Floor:</span>
+
+                <select id="floor-dropdown" class="text-sm font-semibold rounded-xl px-3 py-2 border border-indigo-600 text-indigo-800 bg-white shadow-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
+                    <option value="1/F" selected>1st Floor (1/F)</option>
+                </select>
+            </div>
+
             <div class="flex items-center space-x-2 w-full sm:w-auto">
                 <button id="refresh-button" class="flex items-center justify-center bg-indigo-500 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl transition duration-200 shadow-lg w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed">
                     <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -372,11 +651,25 @@
                     Loading...
                 </span>
             </div>
-
         </div>
 
-        <div id="room-list" class="mt-8">
-            <div class="text-center text-gray-500 py-8">Loading initial data...</div>
+        <div id="list-view-container" class="mt-8">
+            <div id="room-list">
+                <div class="text-center text-gray-500 py-8">Loading initial data...</div>
+            </div>
+        </div>
+
+        <div id="floor-view-container" class="hidden">
+            <div id="map-container" class="floor-plan-container mb-8" data-selected-room="">
+                <div class="text-center text-gray-500 py-8">Loading floor plan...</div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-2xl border border-gray-200">
+                <h3 id="details-title" class="text-xl font-bold text-gray-800 p-4 border-b">Room Details</h3>
+                <div id="room-details-card" class="min-h-[100px] flex items-center justify-center">
+                    <p class="p-6 text-center text-gray-500">Click on a room marker on the map to see its details.</p>
+                </div>
+            </div>
         </div>
 
     </div>
