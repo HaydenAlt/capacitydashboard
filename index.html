@@ -1,12 +1,29 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HPCCSS Room Capacity Dashboard</title>
-        <script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f7fafc;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #a0aec0;
+            border-radius: 4px;
+        }
+    </style>
+    <script>
         const TRANSLATIONS = {
-            'English': {
-                'title': 'HPCCSS Room Capacity Dashboard',
-                'subtitle': 'Welcome to ! Created by Data Research Club',
+            'en': {
+                'title': 'Live Occupancy Monitor',
+                'subtitle': 'Real-time room capacity status. Click refresh to update.',
                 'refresh_data': 'Refresh Data',
                 'loading': 'Loading...',
                 'fetching_data': 'Fetching real-time data...',
@@ -22,18 +39,18 @@
                 'capacity_label': 'Capacity',
                 'people_label': 'people'
             },
-            'Chinese': {
-                'title': 'HPCCSS 房間佔用監控',
+            'zh': {
+                'title': '實時房間佔用監控',
                 'subtitle': '實時房間容量狀態。點擊刷新即可更新。',
-                'refresh_data': '刷新',
+                'refresh_data': '刷新數據',
                 'loading': '載入中...',
                 'fetching_data': '正在獲取實時數據...',
-                'error_loading': '載入數據錯誤。>_<',
+                'error_loading': '載入數據錯誤。請檢查控制台。',
                 'sort_by': '排序方式：',
                 'option_id': '房間編號',
                 'option_percentage': '佔用百分比',
                 'option_people': '人數',
-                'direction_asc': '',
+                'direction_asc': '升序',
                 'direction_desc': '降序',
                 'floor': '樓層',
                 'room_id_label': '房間編號',
@@ -55,7 +72,7 @@
         let currentRoomData = [];
         let currentSortKey = 'id';
         let currentSortDirection = 'asc'; 
-        let currentLang = 'English';
+        let currentLang = 'en';
 
         function translate(key) {
             return TRANSLATIONS[currentLang][key] || key;
@@ -288,3 +305,63 @@
 
     </script>
 </head>
+<body class="p-4 sm:p-6 min-h-screen">
+
+    <div class="max-w-4xl mx-auto">
+        
+        <header class="mb-6 border-b pb-4 flex justify-between items-start">
+            <div>
+                <h1 id="header-title" class="text-3xl font-extrabold text-gray-900 mb-1">Live Occupancy Monitor</h1>
+                <p id="header-subtitle" class="text-gray-500">Real-time room capacity status. Click refresh to update.</p>
+            </div>
+            
+            <select id="lang-dropdown" class="text-sm font-semibold rounded-xl px-3 py-2 border border-gray-300 text-gray-800 bg-white shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
+                <option value="en">English</option>
+                <option value="zh">中文</option>
+            </select>
+        </header>
+
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
+            
+            <div class="flex space-x-2 w-full sm:w-auto items-center">
+                <span id="sort-by-label" class="text-sm font-medium text-gray-600 self-center hidden sm:block">Sort By:</span>
+                
+                <select id="sort-key-dropdown" class="text-sm font-semibold rounded-xl px-3 py-2 border border-indigo-600 text-indigo-800 bg-white shadow-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
+                    <option value="id">Room ID</option>
+                    <option value="percentage">% Full</option>
+                    <option value="people">People</option>
+                </select>
+
+                <button id="sort-direction-toggle" class="text-sm font-semibold rounded-xl px-3 py-2 border border-indigo-600 bg-indigo-600 text-white transition duration-200 flex items-center shadow-md hover:bg-indigo-700" aria-label="Toggle sort direction">
+                    <span id="direction-text">Ascending</span>
+                    <svg id="direction-icon" class="w-4 h-4 ml-2 transition-transform duration-300 transform rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="flex items-center space-x-2 w-full sm:w-auto">
+                <button id="refresh-button" class="flex items-center justify-center bg-indigo-500 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl transition duration-200 shadow-lg w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.5 2v6h-6"/>
+                        <path d="M2.5 22v-6h6"/>
+                        <path d="M2.5 13a9 9 0 0 1 15.6-6.6l3.4-3.4"/>
+                        <path d="M21.5 11a9 9 0 0 1-15.6 6.6l-3.4 3.4"/>
+                    </svg>
+                    <span id="refresh-button-text">Refresh Data</span>
+                </button>
+                <span id="loading-indicator" class="hidden text-sm font-medium text-indigo-600">
+                    Loading...
+                </span>
+            </div>
+
+        </div>
+
+        <div id="room-list" class="mt-8">
+            <div class="text-center text-gray-500 py-8">Loading initial data...</div>
+        </div>
+
+    </div>
+
+</body>
+</html>
